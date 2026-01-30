@@ -1,7 +1,6 @@
 import React from 'react';
 import { Task, TaskStatus } from '../types';
 import { calculateDaysBetween, formatDate } from '../utils/helpers';
-import { STATUS_COLORS } from '../constants';
 
 interface GanttChartProps {
   tasks: Task[];
@@ -67,71 +66,83 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick }) =>
   };
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
-      <div className="min-w-[800px]"> {/* Force scroll on small screens */}
-        
-        {/* Header */}
-        <div className="flex border-b border-gray-200 pb-2 mb-4">
-          <div className="w-48 flex-shrink-0 font-serif font-bold text-gray-700">Task Name</div>
-          <div className="flex-1 flex relative h-8">
-            {months.map((m, idx) => (
-              <div key={idx} style={{ width: `${m.widthPct}%` }} className="text-xs text-gray-500 border-l border-gray-100 px-1 truncate">
-                {m.name}
-              </div>
-            ))}
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="overflow-x-auto relative">
+        <div className="min-w-[1000px] relative"> 
+          
+          {/* Header */}
+          <div className="flex border-b border-gray-200 pb-2 mb-4 sticky top-0 bg-white z-20">
+            <div className="w-48 flex-shrink-0 font-serif font-bold text-gray-700 sticky left-0 bg-white z-30 border-r border-gray-100 pl-1 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Task Name</div>
+            <div className="flex-1 flex relative h-8">
+              {months.map((m, idx) => (
+                <div key={idx} style={{ width: `${m.widthPct}%` }} className="text-xs text-gray-500 border-l border-gray-100 px-1 truncate">
+                  {m.name}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Rows */}
-        <div className="space-y-3">
-          {tasks.sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()).map(task => {
-            const left = getPosition(task.startDate);
-            const width = getWidth(task.startDate, task.endDate);
-            // Clamp width min to be visible
-            const finalWidth = Math.max(width, 1); 
-            
-            // Generate visual color class based on status
-            const colorClass = task.status === TaskStatus.COMPLETED ? 'bg-emerald-400' :
-                               task.status === TaskStatus.IN_PROGRESS ? 'bg-amber-400' :
-                               task.status === TaskStatus.DELAYED ? 'bg-rose-400' : 'bg-slate-300';
+          {/* Rows */}
+          <div className="space-y-3">
+            {tasks.sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()).map(task => {
+              const left = getPosition(task.startDate);
+              const width = getWidth(task.startDate, task.endDate);
+              // Clamp width min to be visible
+              const finalWidth = Math.max(width, 1); 
+              
+              // Generate visual color class based on status
+              const colorClass = task.status === TaskStatus.COMPLETED ? 'bg-emerald-400' :
+                                 task.status === TaskStatus.IN_PROGRESS ? 'bg-amber-400' :
+                                 task.status === TaskStatus.DELAYED ? 'bg-rose-400' : 'bg-slate-300';
+              
+              // Helper to decide if text fits inside or outside
+              const formattedDateRange = `${formatDate(task.startDate)} - ${formatDate(task.endDate)}`;
 
-            return (
-              <div key={task.id} className="flex items-center group">
-                <div className="w-48 flex-shrink-0 pr-4">
-                  <div className="text-sm font-medium text-gray-900 truncate" title={task.name}>{task.name}</div>
-                  <div className="text-xs text-gray-400">{formatDate(task.startDate)}</div>
+              return (
+                <div key={task.id} className="flex items-center group">
+                  {/* Sticky Task Name */}
+                  <div className="w-48 flex-shrink-0 pr-4 sticky left-0 bg-white z-20 border-r border-gray-100 pl-1 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] h-full flex flex-col justify-center">
+                    <div className="text-sm font-medium text-gray-900 truncate" title={task.name}>{task.name}</div>
+                  </div>
+                  
+                  {/* Timeline Bar Area */}
+                  <div className="flex-1 relative h-8 bg-gray-50 rounded-md">
+                     {/* Grid Lines (Visual Guide) */}
+                     <div className="absolute inset-0 flex pointer-events-none">
+                        {months.map((m, idx) => (
+                          <div key={idx} style={{ width: `${m.widthPct}%` }} className="border-l border-gray-100 h-full"></div>
+                        ))}
+                     </div>
+                     
+                     {/* The Task Bar */}
+                     <div 
+                        onClick={() => onTaskClick(task)}
+                        className={`absolute top-1.5 h-5 rounded-md shadow-sm cursor-pointer hover:opacity-80 transition-all ${colorClass} group/bar`}
+                        style={{ left: `${left}%`, width: `${finalWidth}%` }}
+                     >
+                       {/* Date Label - Displays inside the bar, overflows if needed */}
+                       <div className="absolute left-1 top-0.5 text-[10px] leading-4 text-slate-800 whitespace-nowrap overflow-visible font-medium">
+                         {formattedDateRange}
+                       </div>
+
+                       {/* Dependency Connector Dot */}
+                       {task.dependencies.length > 0 && (
+                          <div className="absolute -left-1 top-1.5 w-2 h-2 rounded-full bg-gray-400 border border-white"></div>
+                       )}
+                     </div>
+                  </div>
                 </div>
-                <div className="flex-1 relative h-8 bg-gray-50 rounded-md">
-                   {/* Grid Lines (Visual Guide) */}
-                   <div className="absolute inset-0 flex pointer-events-none">
-                      {months.map((m, idx) => (
-                        <div key={idx} style={{ width: `${m.widthPct}%` }} className="border-l border-gray-100 h-full"></div>
-                      ))}
-                   </div>
-                   
-                   {/* The Task Bar */}
-                   <div 
-                      onClick={() => onTaskClick(task)}
-                      className={`absolute top-1.5 h-5 rounded-md shadow-sm cursor-pointer hover:opacity-80 transition-all ${colorClass}`}
-                      style={{ left: `${left}%`, width: `${finalWidth}%` }}
-                   >
-                     {/* Dependency Connector (Simple dot indicator if needed, or visual link logic is too complex for simple div gantt) */}
-                     {task.dependencies.length > 0 && (
-                        <div className="absolute -left-1 top-1.5 w-2 h-2 rounded-full bg-gray-400 border border-white"></div>
-                     )}
-                   </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
 
-        {/* Legend */}
-        <div className="mt-8 flex gap-4 text-xs text-gray-500 justify-end">
-          <div className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-300 rounded"></div> Not Started</div>
-          <div className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-400 rounded"></div> In Progress</div>
-          <div className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-400 rounded"></div> Completed</div>
-          <div className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-400 rounded"></div> Delayed</div>
+          {/* Legend */}
+          <div className="mt-8 flex gap-4 text-xs text-gray-500 justify-end sticky left-0">
+            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-slate-300 rounded"></div> Not Started</div>
+            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-400 rounded"></div> In Progress</div>
+            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-emerald-400 rounded"></div> Completed</div>
+            <div className="flex items-center gap-1"><div className="w-3 h-3 bg-rose-400 rounded"></div> Delayed</div>
+          </div>
         </div>
       </div>
     </div>

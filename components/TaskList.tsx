@@ -7,11 +7,12 @@ interface TaskListProps {
   tasks: Task[];
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
+  onStatusChange: (id: string, status: TaskStatus) => void;
   filters: FilterState;
   setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
 }
 
-export const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete, filters, setFilters }) => {
+export const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete, onStatusChange, filters, setFilters }) => {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   
   // Filter Logic
@@ -122,12 +123,19 @@ export const TaskList: React.FC<TaskListProps> = ({ tasks, onEdit, onDelete, fil
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap align-top">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full border ${STATUS_COLORS[task.status]}`}>
-                          {task.status}
-                        </span>
+                        <select
+                          value={task.status}
+                          onChange={(e) => onStatusChange(task.id, e.target.value as TaskStatus)}
+                          className={`block w-full pl-2 pr-8 py-1 text-xs font-semibold rounded-full border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary-500 ${STATUS_COLORS[task.status]}`}
+                          style={{ backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`, backgroundPosition: 'right 0.2rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.2em 1.2em' }}
+                        >
+                          {Object.values(TaskStatus).map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
                         {/* Overdue Check */}
                         {task.status !== TaskStatus.COMPLETED && new Date(task.endDate) < new Date() && (
-                          <span className="ml-2 text-xs text-red-500 font-bold" title="Overdue">!</span>
+                          <div className="text-xs text-red-500 font-bold mt-1 text-center" title="Overdue">Overdue</div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 align-top">
