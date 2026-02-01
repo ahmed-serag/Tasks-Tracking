@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
 import { TaskList } from './components/TaskList';
@@ -7,7 +7,8 @@ import { GanttChart } from './components/GanttChart';
 import { TimelineView } from './components/TimelineView';
 import { CsvManager } from './components/CsvManager';
 import { LoadingOverlay } from './components/LoadingOverlay';
-import { Task, ViewMode, FilterState, TaskStatus } from './types';
+import { ConfirmationModal } from './components/ConfirmationModal';
+import { Task, ViewMode, FilterState, TaskStatus, TaskCategory } from './types';
 import { taskService } from './services/api';
 
 // Simple Notification Component Inline
@@ -47,13 +48,25 @@ const App: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
   
+  // Confirmation State
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [taskToDeleteId, setTaskToDeleteId] = useState<string | null>(null);
+  
   // Filters State
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     category: 'All',
-    status: 'All',
+    status: [], 
     dateRange: { start: '', end: '' }
   });
+
+  // Derived State: Dynamic list of categories from existing tasks + Standard Enums
+  const availableCategories = useMemo(() => {
+    const standardCategories = Object.values(TaskCategory) as string[];
+    const usedCategories = tasks.map(t => t.category);
+    const unique = new Set([...standardCategories, ...usedCategories]);
+    return Array.from(unique).sort();
+  }, [tasks]);
 
   // Initial Fetch
   useEffect(() => {
@@ -110,8 +123,6 @@ const App: React.FC = () => {
     setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
 
     try {
-      // We don't turn on full isSaving overlay for small status updates to keep UI snappy
-      // but we do call the service
       await taskService.saveTask(updatedTask, false);
       showNotification(`Task marked as ${newStatus}`, 'success');
     } catch (err) {
@@ -122,13 +133,22 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeleteTask = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this task?")) return;
+  const confirmDeleteTask = (id: string) => {
+    setTaskToDeleteId(id);
+    setIsConfirmOpen(true);
+  };
+
+  const executeDeleteTask = async () => {
+    if (!taskToDeleteId) return;
 
     try {
+      setIsConfirmOpen(false); // Close modal immediately
       setIsSaving(true);
-      await taskService.deleteTask(id);
-      setTasks(prev => prev.filter(t => t.id !== id));
+      
+      await taskService.deleteTask(taskToDeleteId);
+      
+      setTasks(prev => prev.filter(t => t.id !== taskToDeleteId));
+      setIsModalOpen(false); // Also close edit modal if it was open
       showNotification("Task deleted", 'success');
       setError(null);
     } catch (err) {
@@ -136,6 +156,7 @@ const App: React.FC = () => {
       showNotification("Failed to delete task", 'error');
     } finally {
       setIsSaving(false);
+      setTaskToDeleteId(null);
     }
   };
 
@@ -227,8 +248,9 @@ const App: React.FC = () => {
         return (
           <TaskList 
             tasks={tasks} 
+            availableCategories={availableCategories}
             onEdit={handleEditClick} 
-            onDelete={handleDeleteTask}
+            onDelete={confirmDeleteTask}
             onStatusChange={handleStatusChange}
             filters={filters}
             setFilters={setFilters}
@@ -256,6 +278,15 @@ const App: React.FC = () => {
 
       {/* Global Loading Overlay (Optional, used for big ops) */}
       {isSaving && <LoadingOverlay message="Saving changes..." />}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal 
+        isOpen={isConfirmOpen} 
+        onClose={() => setIsConfirmOpen(false)} 
+        onConfirm={executeDeleteTask} 
+        title="Delete Task" 
+        message="Are you sure you want to delete this task? This action cannot be undone." 
+      />
 
       {/* Top Controls */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -304,8 +335,10 @@ const App: React.FC = () => {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         onSave={handleSaveTask}
+        onDelete={confirmDeleteTask}
         initialData={editingTask}
         existingTasks={tasks}
+        availableCategories={availableCategories}
       />
     </Layout>
   );

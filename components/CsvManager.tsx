@@ -1,19 +1,20 @@
+
 import React, { useRef, useState, useEffect } from 'react';
-import { Task } from '../types';
+import { Task, TaskCategory, TaskStatus } from '../types';
 import { tasksToCSV, parseCSVToTasks, downloadCSV } from '../utils/helpers';
 
 interface CsvManagerProps {
   tasks: Task[];
   onImport: (newTasks: Task[]) => void;
-  isImporting: boolean; // Received from parent to show loading state
+  isImporting: boolean;
 }
 
 export const CsvManager: React.FC<CsvManagerProps> = ({ tasks, onImport, isImporting }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [localStatus, setLocalStatus] = useState<'idle' | 'parsing' | 'success' | 'error'>('idle');
   const [statusMsg, setStatusMsg] = useState('');
+  const [showGuide, setShowGuide] = useState(false);
 
-  // Reset status after a few seconds of success/error
   useEffect(() => {
     if (localStatus === 'success' || localStatus === 'error') {
       const timer = setTimeout(() => {
@@ -36,8 +37,8 @@ export const CsvManager: React.FC<CsvManagerProps> = ({ tasks, onImport, isImpor
   };
 
   const handleTemplate = () => {
-    const template = "ID,Task Name,Category,Start Date,End Date,Status,Initial Cost,Actual Cost,Dependencies,Notes\n" +
-                     ",Sample Task,Venue,2024-01-01,2024-02-01,Not Started,1000,0,,This is a sample";
+    const template = "ID,Task Name,Category,Start Date,End Date,Status,Initial Cost,Actual Cost,Dependencies,Notes,Important\n" +
+                     ",Sample Task,Venue,2024-01-01,2024-02-01,Not Started,1000,0,,This is a sample,Yes";
     downloadCSV(template, 'task-import-template.csv');
   };
 
@@ -61,9 +62,6 @@ export const CsvManager: React.FC<CsvManagerProps> = ({ tasks, onImport, isImpor
         try {
           const importedTasks = parseCSVToTasks(content);
           if (importedTasks.length > 0) {
-            // Success parsing, now passing to parent
-            // We don't set 'success' here yet, parent handles the async sync
-            // But for UI feedback we can say "Importing..."
             onImport(importedTasks);
           } else {
             setLocalStatus('error');
@@ -78,7 +76,6 @@ export const CsvManager: React.FC<CsvManagerProps> = ({ tasks, onImport, isImpor
         setLocalStatus('error');
         setStatusMsg('Empty file');
       }
-      // Reset input so same file can be selected again
       if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
@@ -91,7 +88,7 @@ export const CsvManager: React.FC<CsvManagerProps> = ({ tasks, onImport, isImpor
   };
 
   return (
-    <div className="flex gap-2 items-center">
+    <div className="flex gap-2 items-center relative">
       <input 
         type="file" 
         accept=".csv" 
@@ -100,7 +97,6 @@ export const CsvManager: React.FC<CsvManagerProps> = ({ tasks, onImport, isImpor
         className="hidden" 
       />
       
-      {/* Import Button with Status */}
       <div className="relative flex items-center">
         <button 
           onClick={handleImportClick}
@@ -128,8 +124,7 @@ export const CsvManager: React.FC<CsvManagerProps> = ({ tasks, onImport, isImpor
           )}
         </button>
         
-        {/* Floating Status Message */}
-        {(localStatus === 'error' || localStatus === 'success' || statusMsg) && (
+        {statusMsg && (
             <div className={`absolute left-0 -bottom-8 whitespace-nowrap text-xs font-medium px-2 py-1 rounded shadow-sm z-10
               ${localStatus === 'error' ? 'bg-red-100 text-red-700' : 'bg-gray-800 text-white'}`}>
               {statusMsg}
@@ -146,13 +141,79 @@ export const CsvManager: React.FC<CsvManagerProps> = ({ tasks, onImport, isImpor
         </svg>
         Export
       </button>
-       <button 
-        onClick={handleTemplate}
-        className="text-xs text-primary-500 underline ml-1 hover:text-primary-700"
-        title="Download CSV Template"
+
+      <button 
+        onClick={() => setShowGuide(true)}
+        className="p-2 text-gray-400 hover:text-primary-500 transition-colors"
+        title="Import Guide"
       >
-        Template
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
       </button>
+
+      {/* Guide Modal */}
+      {showGuide && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-serif font-bold text-gray-900">Google Sheets Import Guide</h2>
+                <button onClick={() => setShowGuide(false)} className="text-gray-400 hover:text-gray-600 text-2xl">✕</button>
+              </div>
+              
+              <div className="space-y-4 text-sm text-gray-600">
+                <section>
+                  <h3 className="font-bold text-gray-900 mb-2">1. Header Requirements</h3>
+                  <p>Your spreadsheet MUST have these exact headers in the first row:</p>
+                  <div className="bg-gray-50 p-3 rounded border border-gray-100 font-mono text-xs mt-2 overflow-x-auto">
+                    ID, Task Name, Category, Start Date, End Date, Status, Initial Cost, Actual Cost, Dependencies, Notes, Important
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="font-bold text-gray-900 mb-2">2. Supported Categories</h3>
+                  <p>Use any of these (capitalization doesn't matter):</p>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {Object.values(TaskCategory).map(cat => (
+                      <span key={cat} className="px-2 py-1 bg-primary-50 text-primary-700 rounded text-xs border border-primary-100">{cat}</span>
+                    ))}
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="font-bold text-gray-900 mb-2">3. Date Format</h3>
+                  <p>Dates should be in <span className="font-mono">YYYY-MM-DD</span> format for the best results (e.g., 2024-05-20).</p>
+                </section>
+
+                <section>
+                  <h3 className="font-bold text-gray-900 mb-2">4. Exporting from Google Sheets</h3>
+                  <ol className="list-decimal ml-5 space-y-1">
+                    <li>Go to your Google Sheet.</li>
+                    <li>Click <strong>File</strong> > <strong>Download</strong> > <strong>Comma Separated Values (.csv)</strong>.</li>
+                    <li>Click "Import CSV" here and select that file.</li>
+                  </ol>
+                </section>
+              </div>
+
+              <div className="mt-8 flex justify-end gap-3">
+                <button 
+                  onClick={handleTemplate}
+                  className="px-4 py-2 border border-primary-200 text-primary-600 rounded-md hover:bg-primary-50 text-sm font-medium"
+                >
+                  Download Template
+                </button>
+                <button 
+                  onClick={() => setShowGuide(false)}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm font-medium"
+                >
+                  Got it!
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

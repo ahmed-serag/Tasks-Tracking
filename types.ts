@@ -1,3 +1,4 @@
+
 export enum TaskStatus {
   NOT_STARTED = "Not Started",
   IN_PROGRESS = "In Progress",
@@ -12,6 +13,10 @@ export enum TaskCategory {
   PHOTOGRAPHY = "Photography",
   MUSIC = "Music",
   DECOR = "Decor",
+  FLOWERS = "Flowers",
+  STATIONERY = "Stationery",
+  BEAUTY = "Beauty",
+  TRANSPORTATION = "Transportation",
   INVITATIONS = "Invitations",
   GUEST_LIST = "Guest List",
   LEGAL = "Legal",
@@ -30,12 +35,13 @@ export interface Task {
   actualCost: number;
   dependencies: string[]; // Array of Task IDs
   notes: string;
+  important: boolean;
 }
 
 export interface FilterState {
   search: string;
   category: string;
-  status: string;
+  status: string[]; // Changed to array for multi-select
   dateRange: {
     start: string;
     end: string;

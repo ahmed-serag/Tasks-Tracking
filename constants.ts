@@ -1,3 +1,4 @@
+
 import { Task, TaskCategory, TaskStatus } from './types';
 
 export const CATEGORY_COLORS: Record<string, string> = {
@@ -7,6 +8,10 @@ export const CATEGORY_COLORS: Record<string, string> = {
   [TaskCategory.PHOTOGRAPHY]: "#ff8042",
   [TaskCategory.MUSIC]: "#0088fe",
   [TaskCategory.DECOR]: "#00C49F",
+  [TaskCategory.FLOWERS]: "#f472b6",
+  [TaskCategory.STATIONERY]: "#94a3b8",
+  [TaskCategory.BEAUTY]: "#fda4af",
+  [TaskCategory.TRANSPORTATION]: "#7dd3fc",
   [TaskCategory.INVITATIONS]: "#FFBB28",
   [TaskCategory.GUEST_LIST]: "#FF8042",
   [TaskCategory.LEGAL]: "#a4de6c",
@@ -33,6 +38,7 @@ export const SAMPLE_TASKS: Task[] = [
     actualCost: 5200,
     dependencies: [],
     notes: "Ensure capacity for 150 guests.",
+    important: true,
   },
   {
     id: "2",
@@ -45,6 +51,7 @@ export const SAMPLE_TASKS: Task[] = [
     actualCost: 0,
     dependencies: [],
     notes: "Collect addresses from parents.",
+    important: true,
   },
   {
     id: "3",
@@ -57,6 +64,7 @@ export const SAMPLE_TASKS: Task[] = [
     actualCost: 150,
     dependencies: ["1", "2"],
     notes: "Design approved, waiting on printing.",
+    important: false,
   },
   {
     id: "4",
@@ -69,6 +77,7 @@ export const SAMPLE_TASKS: Task[] = [
     actualCost: 0,
     dependencies: ["1"],
     notes: "Tasting scheduled for Feb 10.",
+    important: false,
   },
   {
     id: "5",
@@ -81,6 +90,7 @@ export const SAMPLE_TASKS: Task[] = [
     actualCost: 0,
     dependencies: [],
     notes: "Need to reschedule fitting.",
+    important: true,
   },
   {
     id: "6",
@@ -93,5 +103,6 @@ export const SAMPLE_TASKS: Task[] = [
     actualCost: 0,
     dependencies: ["1"],
     notes: "Look for natural lighting style.",
+    important: false,
   }
 ];

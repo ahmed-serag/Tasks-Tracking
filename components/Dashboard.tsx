@@ -1,17 +1,20 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { 
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, 
   BarChart, Bar, XAxis, YAxis, CartesianGrid 
 } from 'recharts';
 import { Task, TaskStatus } from '../types';
-import { CATEGORY_COLORS, STATUS_COLORS } from '../constants';
-import { formatCurrency, formatDate } from '../utils/helpers';
+import { STATUS_COLORS } from '../constants';
+import { formatCurrency, formatDate, isTaskDelayed, isTaskDueSoon, getCategoryColor } from '../utils/helpers';
 
 interface DashboardProps {
   tasks: Task[];
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
+  const [sortInProgressByImportance, setSortInProgressByImportance] = useState(false);
+
   const totalBudget = tasks.reduce((acc, t) => acc + t.initialCost, 0);
   const totalActual = tasks.reduce((acc, t) => acc + t.actualCost, 0);
   const remainingBudget = totalBudget - totalActual;
@@ -28,47 +31,83 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
   nextWeek.setDate(today.getDate() + 7);
 
   // 1. Delayed Logic
-  // - Marked as Delayed
-  // - Status != Completed AND Due Date in past
-  // - Start Date in past AND Status != In Progress AND Status != Completed
   const delayedTasks = tasks.filter(t => {
     if (t.status === TaskStatus.DELAYED) return true;
     
+    // Skip if no dates
+    if (!t.startDate || !t.endDate) return false;
+
     const start = new Date(t.startDate);
     const end = new Date(t.endDate);
     const isCompleted = t.status === TaskStatus.COMPLETED;
     const isInProgress = t.status === TaskStatus.IN_PROGRESS;
 
-    // Due date passed and not done
     if (!isCompleted && end < today) return true;
-
-    // Should have started but hasn't (Start passed, not in progress, not done)
     if (start < today && !isInProgress && !isCompleted) return true;
 
     return false;
   }).sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
 
   // 2. In Progress Logic
-  const inProgressTasks = tasks.filter(t => t.status === TaskStatus.IN_PROGRESS)
-    .sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
+  const inProgressTasks = tasks.filter(t => {
+    if (t.status !== TaskStatus.IN_PROGRESS) return false;
+
+    // Filter out if it counts as "Due This Week" to avoid duplication
+    if (t.endDate) {
+      const end = new Date(t.endDate);
+      // Check if it falls in the "Due This Week" range (Today -> Next Week)
+      if (end >= today && end <= nextWeek) {
+        return false; 
+      }
+    }
+    
+    return true;
+  }).sort((a, b) => {
+      // Sort by importance if enabled
+      if (sortInProgressByImportance) {
+        if (a.important && !b.important) return -1;
+        if (!a.important && b.important) return 1;
+      }
+
+      // Sort in-progress tasks by end date, putting tasks with no end date last
+      if (!a.endDate) return 1;
+      if (!b.endDate) return -1;
+      return new Date(a.endDate).getTime() - new Date(b.endDate).getTime();
+    });
 
   // 3. Due This Week Logic
-  // - End date within next week
   const dueThisWeekTasks = tasks.filter(t => {
     if (t.status === TaskStatus.COMPLETED) return false;
+    if (!t.endDate) return false;
     const end = new Date(t.endDate);
     return end >= today && end <= nextWeek;
   }).sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
 
   // 4. Upcoming Tasks (Next 5)
-  // - Next 5 tasks based on End Date, future only
   // - MUST be "Not Started"
+  // - Sorted by Start Date (soonest first)
   const upcomingTasks = tasks.filter(t => {
     if (t.status !== TaskStatus.NOT_STARTED) return false;
-    const end = new Date(t.endDate);
-    return end > today;
+    
+    // Filter out delayed tasks (those that should have started already)
+    // Delayed logic covers: status==NOT_STARTED && start < today
+    if (t.startDate) {
+      const start = new Date(t.startDate);
+      if (start < today) return false; 
+    } else if (t.endDate) {
+      // If no start date, check end date to ensure it's not overdue
+      const end = new Date(t.endDate);
+      if (end < today) return false;
+    }
+
+    return true;
   })
-  .sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime())
+  .sort((a, b) => {
+    // Priority: Start Date -> End Date -> Unscheduled Last
+    const dateA = a.startDate ? new Date(a.startDate).getTime() : (a.endDate ? new Date(a.endDate).getTime() : Number.MAX_VALUE);
+    const dateB = b.startDate ? new Date(b.startDate).getTime() : (b.endDate ? new Date(b.endDate).getTime() : Number.MAX_VALUE);
+    return dateA - dateB;
+  })
   .slice(0, 5);
 
   // --- Chart Data Prep ---
@@ -98,7 +137,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
   const TaskListItem = ({ task, dateLabel, accentColor }: { task: Task, dateLabel: string, accentColor: string }) => (
     <div className={`flex justify-between items-center p-3 rounded-md border border-${accentColor}-100 bg-${accentColor}-50/50 hover:bg-${accentColor}-50 transition-colors`}>
       <div className="min-w-0 flex-1 mr-2">
-        <p className="font-medium text-gray-900 text-sm truncate">{task.name}</p>
+        <div className="flex items-center gap-1.5">
+          {task.important && (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 text-amber-500 flex-shrink-0">
+              <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z" clipRule="evenodd" />
+            </svg>
+          )}
+          <p className="font-medium text-gray-900 text-sm truncate">{task.name}</p>
+        </div>
         <p className={`text-xs text-${accentColor}-600 mt-1`}>{task.category}</p>
       </div>
       <div className="text-right flex-shrink-0">
@@ -157,10 +203,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
               delayedTasks.map(task => (
                 <div key={task.id} className="flex justify-between items-start p-3 bg-rose-50 rounded-md border border-rose-100">
                   <div className="min-w-0 flex-1 mr-2">
-                    <p className="font-medium text-gray-900 text-sm truncate">{task.name}</p>
+                    <div className="flex items-center gap-1.5">
+                      {task.important && (
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 text-amber-500 flex-shrink-0">
+                          <path fillRule="evenodd" d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                      <p className="font-medium text-gray-900 text-sm truncate">{task.name}</p>
+                    </div>
                     <p className="text-xs text-rose-500 mt-1">
                       {task.status === TaskStatus.DELAYED ? 'Marked as Delayed' : 
-                       new Date(task.endDate) < today ? 'Past Due' : 'Start Date Passed'}
+                       (task.endDate && new Date(task.endDate) < today) ? 'Past Due' : 'Start Date Passed'}
                     </p>
                   </div>
                   <div className="text-right whitespace-nowrap">
@@ -176,17 +229,35 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
 
         {/* 2. In Progress Tasks */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-amber-200">
-          <div className="flex items-center gap-2 mb-4 text-amber-700">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-             </svg>
-             <h3 className="text-lg font-serif font-semibold">In Progress</h3>
-             {inProgressTasks.length > 0 && <span className="ml-auto bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded-full">{inProgressTasks.length}</span>}
+          <div className="flex items-center justify-between mb-4 text-amber-700">
+             <div className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <h3 className="text-lg font-serif font-semibold">In Progress</h3>
+                {inProgressTasks.length > 0 && <span className="bg-amber-100 text-amber-800 text-xs font-bold px-2 py-1 rounded-full">{inProgressTasks.length}</span>}
+             </div>
+             
+             <label className="flex items-center gap-2 cursor-pointer group select-none">
+                <span className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${sortInProgressByImportance ? 'text-amber-800' : 'text-amber-800/50'}`}>
+                  Priority
+                </span>
+                <div className="relative">
+                   <input 
+                     type="checkbox" 
+                     className="sr-only"
+                     checked={sortInProgressByImportance}
+                     onChange={(e) => setSortInProgressByImportance(e.target.checked)}
+                   />
+                   <div className={`block w-8 h-4 rounded-full transition-colors ${sortInProgressByImportance ? 'bg-amber-500' : 'bg-amber-200'}`}></div>
+                   <div className={`absolute left-0.5 top-0.5 bg-white w-3 h-3 rounded-full transition-transform transform ${sortInProgressByImportance ? 'translate-x-4' : 'translate-x-0'}`}></div>
+                </div>
+             </label>
           </div>
           <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
             {inProgressTasks.length > 0 ? (
               inProgressTasks.map(task => (
-                <TaskListItem key={task.id} task={task} dateLabel={`Due: ${formatDate(task.endDate)}`} accentColor="amber" />
+                <TaskListItem key={task.id} task={task} dateLabel={task.endDate ? `Due: ${formatDate(task.endDate)}` : 'No deadline'} accentColor="amber" />
               ))
             ) : (
                <p className="text-gray-400 text-sm italic py-2">No tasks currently in progress.</p>
@@ -225,7 +296,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
           <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
             {upcomingTasks.length > 0 ? (
               upcomingTasks.map(task => (
-                <TaskListItem key={task.id} task={task} dateLabel={formatDate(task.endDate)} accentColor="emerald" />
+                <TaskListItem 
+                  key={task.id} 
+                  task={task} 
+                  dateLabel={task.startDate ? `Starts: ${formatDate(task.startDate)}` : (task.endDate ? `Due: ${formatDate(task.endDate)}` : 'TBD')} 
+                  accentColor="emerald" 
+                />
               ))
             ) : (
                <p className="text-gray-400 text-sm italic py-2">No upcoming Not Started tasks found.</p>
@@ -253,7 +329,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
                   dataKey="value"
                 >
                   {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={CATEGORY_COLORS[entry.name] || '#8884d8'} />
+                    <Cell key={`cell-${index}`} fill={getCategoryColor(entry.name)} />
                   ))}
                 </Pie>
                 <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
