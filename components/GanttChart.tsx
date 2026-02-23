@@ -143,7 +143,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick }) =>
   const isTodayVisible = todayPos >= 0 && todayPos <= 100;
 
   return (
-    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 overflow-hidden text-elegant-slate">
       {/* Header / Breadcrumbs */}
       <div className="flex items-center justify-between mb-6">
         <nav className="flex items-center gap-2" aria-label="Breadcrumb">
@@ -237,7 +237,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick }) =>
                 else if (task!.status === TaskStatus.IN_PROGRESS) barColor = 'bg-amber-400';
               }
 
-              // const formattedDateRange = `${formatDate(startDate)} - ${formatDate(endDate)}`;
+              const formattedDateRange = `${formatDate(startDate)} — ${formatDate(endDate)}`;
 
               return (
                 <div key={isTask ? task!.id : category!.name} className="flex items-center group/row hover:bg-gray-50/50 transition-colors">
@@ -245,7 +245,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick }) =>
                   <div className={`w-64 flex-shrink-0 pr-4 sticky left-0 bg-white z-20 border-r border-gray-100 pl-4 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] h-12 flex flex-col justify-center ${isCompleted ? 'opacity-50' : ''}`}>
                     <div 
                       className={`flex items-center gap-1.5 text-sm font-medium truncate ${isDelayed ? 'text-rose-600 font-bold' : isCompleted ? 'text-gray-400 line-through decoration-1' : 'text-gray-900'} hover:text-primary-600 transition-colors cursor-pointer group-hover/row:translate-x-1 duration-200`} 
-                      title={name}
+                      title={!isTask ? `${name}: ${formattedDateRange}` : name}
                       onClick={() => isTask ? onTaskClick(task!) : setDrilldownCategory(category!.name)}
                     >
                       {isTask && task!.important && (
@@ -274,6 +274,7 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick }) =>
                      {/* The Interactive Bar */}
                      <div 
                         onClick={() => isTask ? onTaskClick(task!) : setDrilldownCategory(category!.name)}
+                        title={`${name}: ${formattedDateRange}`}
                         className={`absolute h-6 rounded shadow-sm cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-primary-300 transition-all group/bar flex items-center px-2 overflow-hidden ${barColor} ${isCompleted ? 'opacity-40 grayscale-[0.3]' : ''}`}
                         style={{ 
                           left: `${left}%`, 
@@ -285,8 +286,6 @@ export const GanttChart: React.FC<GanttChartProps> = ({ tasks, onTaskClick }) =>
                         <span className={`text-[10px] font-bold truncate pointer-events-none ${isDelayed || !isTask ? 'text-white' : 'text-slate-800'}`}>
                            {name}
                         </span>
-
-                        {/* Tooltip removed */}
                         
                         {/* Dependency Dot */}
                         {isTask && task!.dependencies.length > 0 && (

@@ -46,7 +46,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onEdit, onSta
   const todayMonthKey = today.toLocaleString('default', { month: 'long', year: 'numeric' });
 
   return (
-    <div className="max-w-3xl mx-auto p-4">
+    <div className="w-full">
       {sortedKeys.map((monthGroup) => {
         const isCurrentMonth = monthGroup === todayMonthKey;
         const isUnscheduled = monthGroup === "Unscheduled";

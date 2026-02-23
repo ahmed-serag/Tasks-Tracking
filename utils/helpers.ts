@@ -20,6 +20,19 @@ export const formatDate = (dateStr: string): string => {
   }).format(date);
 };
 
+// Add compareDates for sorting logic in Dashboard and other components
+export const compareDates = (a: string | undefined | null, b: string | undefined | null): number => {
+  if (!a && !b) return 0;
+  if (!a) return 1;
+  if (!b) return -1;
+  const dateA = new Date(a).getTime();
+  const dateB = new Date(b).getTime();
+  if (isNaN(dateA) && isNaN(dateB)) return 0;
+  if (isNaN(dateA)) return 1;
+  if (isNaN(dateB)) return -1;
+  return dateA - dateB;
+};
+
 export const calculateDaysBetween = (start: string, end: string): number => {
   if (!start || !end) return 0;
   const s = new Date(start);

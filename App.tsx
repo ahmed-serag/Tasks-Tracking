@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
@@ -5,13 +6,13 @@ import { TaskList } from './components/TaskList';
 import { TaskForm } from './components/TaskForm';
 import { GanttChart } from './components/GanttChart';
 import { TimelineView } from './components/TimelineView';
+import { TodoView } from './components/TodoView';
 import { CsvManager } from './components/CsvManager';
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { ConfirmationModal } from './components/ConfirmationModal';
-import { Task, ViewMode, FilterState, TaskStatus, TaskCategory } from './types';
+import { Task, ViewMode, FilterState, TaskStatus } from './types';
 import { taskService } from './services/api';
 
-// Simple Notification Component Inline
 const Toast: React.FC<{ message: string; type: 'success' | 'error'; onClose: () => void }> = ({ message, type, onClose }) => {
   useEffect(() => {
     const timer = setTimeout(onClose, 4000);
@@ -34,41 +35,39 @@ const Toast: React.FC<{ message: string; type: 'success' | 'error'; onClose: () 
 };
 
 const App: React.FC = () => {
-  // Data State
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // Notification State
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
-  // UI State
   const [view, setView] = useState<ViewMode>('dashboard');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>(undefined);
-  
-  // Confirmation State
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [taskToDeleteId, setTaskToDeleteId] = useState<string | null>(null);
-  
-  // Filters State
+  const [dashboardPrioritySort, setDashboardPrioritySort] = useState(() => {
+    const saved = localStorage.getItem('blissplan_priority_sort');
+    return saved === 'true';
+  });
+
   const [filters, setFilters] = useState<FilterState>({
     search: '',
     category: 'All',
-    status: [], 
+    status: [TaskStatus.NOT_STARTED, TaskStatus.IN_PROGRESS], 
     dateRange: { start: '', end: '' }
   });
 
-  // Derived State: Dynamic list of categories from existing tasks + Standard Enums
-  const availableCategories = useMemo(() => {
-    const standardCategories = Object.values(TaskCategory) as string[];
-    const usedCategories = tasks.map(t => t.category);
-    const unique = new Set([...standardCategories, ...usedCategories]);
-    return Array.from(unique).sort();
-  }, [tasks]);
+  const weddingTasks = useMemo(() => tasks.filter(t => !t.type || t.type === 'wedding'), [tasks]);
 
-  // Initial Fetch
+  const weddingCategories = useMemo(() => {
+    const used = weddingTasks.map(t => t.category);
+    return Array.from(new Set(used.filter(c => c && c.trim() !== ''))).sort();
+  }, [weddingTasks]);
+
+  useEffect(() => {
+    localStorage.setItem('blissplan_priority_sort', dashboardPrioritySort.toString());
+  }, [dashboardPrioritySort]);
+
   useEffect(() => {
     const loadTasks = async () => {
       try {
@@ -90,16 +89,12 @@ const App: React.FC = () => {
     setNotification({ message, type });
   };
 
-  // Handlers
   const handleSaveTask = async (task: Task) => {
     try {
       setIsSaving(true);
       const isNew = !tasks.some(t => t.id === task.id);
-      
-      // Call API
-      const savedTask = await taskService.saveTask(task, isNew);
-      
-      // Update Local State
+      const taskWithDefaults = { ...task, type: task.type || 'wedding' };
+      const savedTask = await taskService.saveTask(taskWithDefaults, isNew);
       setTasks(prev => {
         if (isNew) return [...prev, savedTask];
         return prev.map(t => t.id === savedTask.id ? savedTask : t);
@@ -117,17 +112,13 @@ const App: React.FC = () => {
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
-
-    // Optimistic Update
     const updatedTask = { ...task, status: newStatus };
     setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
-
     try {
       await taskService.saveTask(updatedTask, false);
       showNotification(`Task marked as ${newStatus}`, 'success');
     } catch (err) {
       console.error(err);
-      // Revert on failure
       setTasks(prev => prev.map(t => t.id === taskId ? task : t));
       showNotification("Failed to update status", 'error');
     }
@@ -140,15 +131,12 @@ const App: React.FC = () => {
 
   const executeDeleteTask = async () => {
     if (!taskToDeleteId) return;
-
     try {
-      setIsConfirmOpen(false); // Close modal immediately
+      setIsConfirmOpen(false);
       setIsSaving(true);
-      
       await taskService.deleteTask(taskToDeleteId);
-      
       setTasks(prev => prev.filter(t => t.id !== taskToDeleteId));
-      setIsModalOpen(false); // Also close edit modal if it was open
+      setIsModalOpen(false);
       showNotification("Task deleted", 'success');
       setError(null);
     } catch (err) {
@@ -172,42 +160,11 @@ const App: React.FC = () => {
 
   const handleImport = async (newTasks: Task[]) => {
     if (newTasks.length === 0) return;
-    
     try {
       setIsSaving(true); 
-      
-      // Map to store Old ID -> New UUID mapping
-      const idMap = new Map<string, string>();
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-      // 1. First pass: Sanitize IDs
-      const tasksWithValidIds = newTasks.map(t => {
-        const isUUID = uuidRegex.test(t.id);
-        const isDuplicate = tasks.some(existing => existing.id === t.id);
-        
-        if (!isUUID || isDuplicate) {
-          const newId = crypto.randomUUID();
-          idMap.set(t.id, newId);
-          return { ...t, id: newId };
-        }
-        return t;
-      });
-
-      // 2. Second pass: Update dependencies to point to the new IDs
-      const finalTasks = tasksWithValidIds.map(t => ({
-        ...t,
-        dependencies: t.dependencies
-          .map(depId => idMap.get(depId) || depId) 
-          .filter(depId => tasksWithValidIds.some(valid => valid.id === depId) || tasks.some(existing => existing.id === depId)) 
-      }));
-      
-      // 3. Sync to Backend
-      const syncedTasks = await taskService.syncTasks(finalTasks);
-      
-      // Update state
+      const syncedTasks = await taskService.clearAndReplaceAllTasks(newTasks);
       setTasks(syncedTasks);
-      showNotification(`Successfully imported ${newTasks.length} tasks`, 'success');
-      
+      showNotification(`Successfully reset plan with ${newTasks.length} tasks`, 'success');
     } catch (err: any) {
       console.error("Import failed:", err);
       showNotification(err.message || "Failed to import tasks", 'error');
@@ -216,13 +173,12 @@ const App: React.FC = () => {
     }
   };
 
-  // View Components Map
   const renderView = () => {
     if (isLoading) {
       return (
         <div className="flex flex-col items-center justify-center h-96 text-gray-400">
            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-400 mb-4"></div>
-           <p>Loading your wedding plan...</p>
+           <p>Loading your planner...</p>
         </div>
       );
     }
@@ -243,12 +199,19 @@ const App: React.FC = () => {
 
     switch (view) {
       case 'dashboard':
-        return <Dashboard tasks={tasks} />;
+        return (
+          <Dashboard 
+            tasks={weddingTasks} 
+            onTaskClick={handleEditClick} 
+            prioritySort={dashboardPrioritySort}
+            onPrioritySortChange={setDashboardPrioritySort}
+          />
+        );
       case 'list':
         return (
           <TaskList 
-            tasks={tasks} 
-            availableCategories={availableCategories}
+            tasks={weddingTasks} 
+            availableCategories={weddingCategories}
             onEdit={handleEditClick} 
             onDelete={confirmDeleteTask}
             onStatusChange={handleStatusChange}
@@ -257,17 +220,32 @@ const App: React.FC = () => {
           />
         );
       case 'gantt':
-        return <GanttChart tasks={tasks} onTaskClick={handleEditClick} />;
+        return <GanttChart tasks={weddingTasks} onTaskClick={handleEditClick} />;
       case 'timeline':
-        return <TimelineView tasks={tasks} onEdit={handleEditClick} onStatusChange={handleStatusChange} />;
+        return <TimelineView tasks={weddingTasks} onEdit={handleEditClick} onStatusChange={handleStatusChange} />;
+      case 'todo':
+        return (
+          <TodoView 
+            tasks={tasks}
+            onSave={handleSaveTask}
+            onStatusChange={handleStatusChange}
+            onEdit={handleEditClick}
+          />
+        );
       default:
-        return <Dashboard tasks={tasks} />;
+        return (
+          <Dashboard 
+            tasks={weddingTasks} 
+            onTaskClick={handleEditClick}
+            prioritySort={dashboardPrioritySort}
+            onPrioritySortChange={setDashboardPrioritySort}
+          />
+        );
     }
   };
 
   return (
     <Layout>
-      {/* Toast Notification */}
       {notification && (
         <Toast 
           message={notification.message} 
@@ -276,10 +254,8 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* Global Loading Overlay (Optional, used for big ops) */}
-      {isSaving && <LoadingOverlay message="Saving changes..." />}
+      {isSaving && <LoadingOverlay message="Processing changes..." />}
 
-      {/* Confirmation Modal */}
       <ConfirmationModal 
         isOpen={isConfirmOpen} 
         onClose={() => setIsConfirmOpen(false)} 
@@ -288,34 +264,15 @@ const App: React.FC = () => {
         message="Are you sure you want to delete this task? This action cannot be undone." 
       />
 
-      {/* Top Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        
-        {/* View Switcher */}
-        <div className="bg-white p-1 rounded-lg border border-gray-200 inline-flex shadow-sm">
-          {(['dashboard', 'list', 'gantt', 'timeline'] as ViewMode[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setView(mode)}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors capitalize ${
-                view === mode 
-                  ? 'bg-primary-100 text-primary-800' 
-                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
-              }`}
-            >
-              {mode}
-            </button>
-          ))}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-3">
+      {/* Optimized Layout: Utility Bar separated from Navigation Tabs */}
+      <div className="flex flex-col space-y-6 mb-10">
+        {/* Row 1: Utility Actions (Import, Export, Add Task) */}
+        <div className="flex flex-wrap items-center justify-end gap-3">
           <CsvManager tasks={tasks} onImport={handleImport} isImporting={isSaving} />
-          
           <button
             onClick={handleAddNew}
             disabled={isLoading}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
+            className="inline-flex items-center px-5 py-2.5 border border-transparent text-sm font-bold rounded-xl shadow-lg text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-4 focus:ring-primary-100 transition-all active:scale-95 disabled:opacity-50"
           >
             <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
@@ -323,14 +280,38 @@ const App: React.FC = () => {
             Add Task
           </button>
         </div>
+
+        {/* Row 2: Navigation Tabs */}
+        <div className="flex items-center justify-start">
+          <div className="bg-white p-1 rounded-xl border border-gray-200 inline-flex shadow-sm overflow-x-auto max-w-full no-scrollbar">
+            {(['dashboard', 'list', 'gantt', 'timeline', 'todo'] as ViewMode[]).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setView(mode)}
+                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all capitalize whitespace-nowrap flex items-center gap-2 ${
+                  view === mode 
+                    ? 'bg-primary-600 text-white shadow-md shadow-primary-200' 
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                {mode === 'todo' ? (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                    </svg>
+                    To-Do List
+                  </>
+                ) : mode}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* Main Content Area */}
       <div className="min-h-[500px]">
         {renderView()}
       </div>
 
-      {/* Modal */}
       <TaskForm 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
@@ -338,7 +319,7 @@ const App: React.FC = () => {
         onDelete={confirmDeleteTask}
         initialData={editingTask}
         existingTasks={tasks}
-        availableCategories={availableCategories}
+        allTasks={tasks}
       />
     </Layout>
   );

@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Task } from '../types';
 import { SAMPLE_TASKS } from '../constants';
@@ -171,5 +172,46 @@ export const taskService = {
     const merged = [...current, ...newTasks];
     setLocal(merged);
     return merged;
+  },
+
+  /**
+   * Reset the entire plan with a new set of tasks (used by CSV import)
+   */
+  async clearAndReplaceAllTasks(newTasks: Task[]): Promise<Task[]> {
+    if (!isConfigured || !supabase) {
+      return this.clearAndReplaceLocal(newTasks);
+    }
+
+    try {
+      // Clear all existing tasks by matching all rows (filter by neq on non-existent id)
+      const { error: deleteError } = await supabase
+        .from('tasks')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); 
+
+      if (deleteError) throw deleteError;
+
+      // Insert the new tasks
+      const { data, error: insertError } = await supabase
+        .from('tasks')
+        .insert(newTasks)
+        .select();
+
+      if (insertError) throw insertError;
+      return data as Task[];
+
+    } catch (error: any) {
+      if (error.code === '42P01' || error.message?.includes('fetch failed')) {
+        return this.clearAndReplaceLocal(newTasks);
+      }
+      console.error('Supabase reset error:', error);
+      throw new Error(error.message);
+    }
+  },
+
+  async clearAndReplaceLocal(newTasks: Task[]): Promise<Task[]> {
+    await mockDelay(1000);
+    setLocal(newTasks);
+    return newTasks;
   }
 };
