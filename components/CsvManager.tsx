@@ -190,7 +190,7 @@ export const CsvManager: React.FC<CsvManagerProps> = ({ tasks, onImport, isImpor
                   <h3 className="font-bold text-gray-900 mb-2">4. Exporting from Google Sheets</h3>
                   <ol className="list-decimal ml-5 space-y-1">
                     <li>Go to your Google Sheet.</li>
-                    <li>Click <strong>File</strong> > <strong>Download</strong> > <strong>Comma Separated Values (.csv)</strong>.</li>
+                    <li>Click <strong>File</strong> &gt; <strong>Download</strong> &gt; <strong>Comma Separated Values (.csv)</strong>.</li>
                     <li>Click "Import CSV" here and select that file.</li>
                   </ol>
                 </section>
