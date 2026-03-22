@@ -177,8 +177,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks, onTaskClick, priori
                        (task.endDate && new Date(task.endDate) < today) ? 'Past Due' : 'Start Date Passed'}
                     </p>
                   </div>
-                  <div className="text-right whitespace-nowrap">
-                    <p className="text-xs font-bold text-rose-700">{formatDate(task.endDate)}</p>
+                  <div className="text-right whitespace-nowrap flex flex-col items-end justify-center">
+                    <p className="text-[10px] text-rose-500 font-medium mb-0.5">Start: {formatDate(task.startDate)}</p>
+                    <p className="text-xs font-bold text-rose-700">Due: {formatDate(task.endDate)}</p>
                   </div>
                 </div>
               ))
