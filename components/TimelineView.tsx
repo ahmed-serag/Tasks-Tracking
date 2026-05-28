@@ -11,19 +11,19 @@ interface TimelineViewProps {
 }
 
 export const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onEdit, onStatusChange }) => {
-  // Sort tasks by end date (deadlines)
+  // Sort tasks by start date
   const sortedTasks = [...tasks].sort((a, b) => {
-    if (!a.endDate && !b.endDate) return 0;
-    if (!a.endDate) return -1; // Unscheduled first
-    if (!b.endDate) return 1;
-    return new Date(a.endDate).getTime() - new Date(b.endDate).getTime();
+    if (!a.startDate && !b.startDate) return 0;
+    if (!a.startDate) return -1; // Unscheduled first
+    if (!b.startDate) return 1;
+    return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
   });
   
   // Group by Month Year, putting empty dates in "Unscheduled"
   const groupedTasks = sortedTasks.reduce((acc, task) => {
     let key = "Unscheduled";
-    if (task.endDate) {
-      const date = new Date(task.endDate);
+    if (task.startDate) {
+      const date = new Date(task.startDate);
       if (!isNaN(date.getTime())) {
         key = date.toLocaleString('default', { month: 'long', year: 'numeric' });
       }
@@ -70,12 +70,12 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onEdit, onSta
               {groupedTasks[monthGroup].map((task, index) => {
                 const isCompleted = task.status === TaskStatus.COMPLETED;
                 const isDelayed = !isCompleted && isTaskDelayed(task);
-                const taskDate = task.endDate ? new Date(task.endDate) : null;
+                const taskDate = task.startDate ? new Date(task.startDate) : null;
                 
                 // Show today line logic
                 const showTodayLine = isCurrentMonth && taskDate &&
                                     (taskDate >= today) && 
-                                    (index === 0 || (groupedTasks[monthGroup][index-1].endDate && new Date(groupedTasks[monthGroup][index-1].endDate) < today));
+                                    (index === 0 || (groupedTasks[monthGroup][index-1].startDate && new Date(groupedTasks[monthGroup][index-1].startDate!) < today));
 
                 return (
                   <React.Fragment key={task.id}>
@@ -142,7 +142,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ tasks, onEdit, onSta
                          )}
 
                          <div onClick={() => onEdit(task)} className="mt-3 flex items-center justify-between text-xs text-gray-400 cursor-pointer">
-                            <span className={isDelayed ? 'text-rose-500 font-bold' : ''}>{task.endDate ? `Due: ${formatDate(task.endDate)}` : 'No deadline'}</span>
+                            <span className={isDelayed ? 'text-rose-500 font-bold' : ''}>
+                              {task.startDate ? `Start: ${formatDate(task.startDate)}` : 'No start date'} 
+                              {' • '}
+                              {task.endDate ? `Due: ${formatDate(task.endDate)}` : 'No deadline'}
+                            </span>
                             {task.actualCost > 0 && <span>Spent: ${task.actualCost}</span>}
                          </div>
                       </div>

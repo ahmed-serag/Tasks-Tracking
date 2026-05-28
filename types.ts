@@ -6,8 +6,6 @@ export enum TaskStatus {
   DELAYED = "Delayed"
 }
 
-export type TaskType = 'wedding' | 'lina' | 'serag';
-
 export enum TaskCategory {
   VENUE = "Venue",
   CATERING = "Catering",
@@ -39,7 +37,6 @@ export interface Task {
   dependencies: string[]; // Array of Task IDs
   notes: string;
   important: boolean;
-  type?: TaskType; // 'wedding' (default), 'lina', or 'serag'
 }
 
 export interface FilterState {
@@ -52,4 +49,4 @@ export interface FilterState {
   };
 }
 
-export type ViewMode = 'dashboard' | 'list' | 'gantt' | 'timeline' | 'todo';
+export type ViewMode = 'dashboard' | 'list' | 'gantt' | 'timeline' | 'pdf';

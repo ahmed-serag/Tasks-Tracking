@@ -6,7 +6,7 @@ import { TaskList } from './components/TaskList';
 import { TaskForm } from './components/TaskForm';
 import { GanttChart } from './components/GanttChart';
 import { TimelineView } from './components/TimelineView';
-import { TodoView } from './components/TodoView';
+import { PdfTimelineView } from './components/PdfTimelineView';
 import { CsvManager } from './components/CsvManager';
 import { LoadingOverlay } from './components/LoadingOverlay';
 import { ConfirmationModal } from './components/ConfirmationModal';
@@ -57,12 +57,10 @@ const App: React.FC = () => {
     dateRange: { start: '', end: '' }
   });
 
-  const weddingTasks = useMemo(() => tasks.filter(t => !t.type || t.type === 'wedding'), [tasks]);
-
   const weddingCategories = useMemo(() => {
-    const used = weddingTasks.map(t => t.category);
+    const used = tasks.map(t => t.category);
     return Array.from(new Set(used.filter(c => c && c.trim() !== ''))).sort();
-  }, [weddingTasks]);
+  }, [tasks]);
 
   useEffect(() => {
     localStorage.setItem('blissplan_priority_sort', dashboardPrioritySort.toString());
@@ -93,8 +91,7 @@ const App: React.FC = () => {
     try {
       setIsSaving(true);
       const isNew = !tasks.some(t => t.id === task.id);
-      const taskWithDefaults = { ...task, type: task.type || 'wedding' };
-      const savedTask = await taskService.saveTask(taskWithDefaults, isNew);
+      const savedTask = await taskService.saveTask(task, isNew);
       setTasks(prev => {
         if (isNew) return [...prev, savedTask];
         return prev.map(t => t.id === savedTask.id ? savedTask : t);
@@ -201,7 +198,7 @@ const App: React.FC = () => {
       case 'dashboard':
         return (
           <Dashboard 
-            tasks={weddingTasks} 
+            tasks={tasks} 
             onTaskClick={handleEditClick} 
             prioritySort={dashboardPrioritySort}
             onPrioritySortChange={setDashboardPrioritySort}
@@ -210,7 +207,7 @@ const App: React.FC = () => {
       case 'list':
         return (
           <TaskList 
-            tasks={weddingTasks} 
+            tasks={tasks} 
             availableCategories={weddingCategories}
             onEdit={handleEditClick} 
             onDelete={confirmDeleteTask}
@@ -220,22 +217,15 @@ const App: React.FC = () => {
           />
         );
       case 'gantt':
-        return <GanttChart tasks={weddingTasks} onTaskClick={handleEditClick} />;
+        return <GanttChart tasks={tasks} onTaskClick={handleEditClick} />;
       case 'timeline':
-        return <TimelineView tasks={weddingTasks} onEdit={handleEditClick} onStatusChange={handleStatusChange} />;
-      case 'todo':
-        return (
-          <TodoView 
-            tasks={tasks}
-            onSave={handleSaveTask}
-            onStatusChange={handleStatusChange}
-            onEdit={handleEditClick}
-          />
-        );
+        return <TimelineView tasks={tasks} onEdit={handleEditClick} onStatusChange={handleStatusChange} />;
+      case 'pdf':
+        return <PdfTimelineView />;
       default:
         return (
           <Dashboard 
-            tasks={weddingTasks} 
+            tasks={tasks} 
             onTaskClick={handleEditClick}
             prioritySort={dashboardPrioritySort}
             onPrioritySortChange={setDashboardPrioritySort}
@@ -284,7 +274,7 @@ const App: React.FC = () => {
         {/* Row 2: Navigation Tabs */}
         <div className="flex items-center justify-start">
           <div className="bg-white p-1 rounded-xl border border-gray-200 inline-flex shadow-sm overflow-x-auto max-w-full no-scrollbar">
-            {(['dashboard', 'list', 'gantt', 'timeline', 'todo'] as ViewMode[]).map((mode) => (
+            {(['dashboard', 'list', 'gantt', 'timeline', 'pdf'] as ViewMode[]).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setView(mode)}
@@ -294,14 +284,7 @@ const App: React.FC = () => {
                     : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                 }`}
               >
-                {mode === 'todo' ? (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                    </svg>
-                    To-Do List
-                  </>
-                ) : mode}
+                {mode === 'pdf' ? 'Wedding Day' : mode}
               </button>
             ))}
           </div>

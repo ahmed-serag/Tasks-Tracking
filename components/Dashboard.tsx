@@ -104,6 +104,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks, onTaskClick, priori
                 Due This Week
               </span>
             )}
+            {task.attachments && task.attachments.length > 0 && (
+              <span className="text-gray-400" title={`${task.attachments.length} attachment(s)`}>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+              </span>
+            )}
           </div>
           <p className={`text-xs text-${accentColor}-600 mt-1`}>{task.category}</p>
         </div>
@@ -170,6 +175,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks, onTaskClick, priori
                           </svg>
                         )}
                       <p className="font-medium text-gray-900 text-sm truncate group-hover:text-primary-600">{task.name}</p>
+                      {task.attachments && task.attachments.length > 0 && (
+                        <span className="text-rose-400" title={`${task.attachments.length} attachment(s)`}>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                        </span>
+                      )}
                     </div>
                     <p className="text-[10px] text-rose-600 uppercase tracking-tight font-bold mt-0.5">{task.category}</p>
                     <p className="text-xs text-rose-500 mt-0.5">

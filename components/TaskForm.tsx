@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Task, TaskCategory, TaskStatus, TaskType } from '../types';
+import { Task, TaskCategory, TaskStatus } from '../types';
 import { SearchableSelect } from './SearchableSelect';
 
 interface TaskFormProps {
@@ -24,8 +24,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, onD
     actualCost: 0,
     dependencies: [],
     notes: '',
-    important: false,
-    type: 'wedding'
+    important: false
   });
 
   const [isNewCategory, setIsNewCategory] = useState(false);
@@ -33,12 +32,9 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, onD
   const [error, setError] = useState<string>('');
 
   const typeSpecificCategories = useMemo(() => {
-    const currentType = formData.type || 'wedding';
-    const used = allTasks
-      .filter(t => (t.type || 'wedding') === currentType)
-      .map(t => t.category);
+    const used = allTasks.map(t => t.category);
     return Array.from(new Set(used.filter(c => c && c.trim() !== ''))).sort();
-  }, [allTasks, formData.type]);
+  }, [allTasks]);
 
   useEffect(() => {
     if (isOpen) {
@@ -55,7 +51,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, onD
 
         setFormData({
           ...initialData,
-          type: initialData.type || 'wedding',
           startDate: extractDate(initialData.startDate),
           endDate: extractDate(initialData.endDate)
         });
@@ -71,11 +66,10 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, onD
           actualCost: 0,
           dependencies: [],
           notes: '',
-          important: false,
-          type: 'wedding'
+          important: false
         });
         
-        const weddingCats = allTasks.filter(t => (t.type || 'wedding') === 'wedding').length;
+        const weddingCats = allTasks.length;
         setIsNewCategory(weddingCats === 0);
       }
       setError('');
@@ -87,10 +81,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, onD
       const updated = { ...prev, [field]: value };
       if (field === 'startDate' && value && !prev.endDate) {
         updated.endDate = value;
-      }
-      if (field === 'type' && value !== prev.type) {
-        updated.category = ''; 
-        setIsNewCategory(true);
       }
       return updated;
     });
@@ -156,34 +146,6 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, onD
             
             {error && <div className="text-red-500 text-sm bg-red-50 p-3 rounded-xl border border-red-100 font-medium">{error}</div>}
 
-            {/* Type Selection - High Visibility */}
-            <div className="space-y-2">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Task Context</label>
-              <div className="flex bg-gray-100 p-1.5 rounded-xl border border-gray-200 gap-1">
-                <button 
-                  type="button" 
-                  onClick={() => handleChange('type', 'wedding')}
-                  className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${formData.type === 'wedding' ? 'bg-white text-primary-600 shadow-sm ring-1 ring-black/5' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  Wedding
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => handleChange('type', 'lina')}
-                  className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${formData.type === 'lina' ? 'bg-white text-primary-600 shadow-sm ring-1 ring-black/5' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  Lina's Day
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => handleChange('type', 'serag')}
-                  className={`flex-1 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-all ${formData.type === 'serag' ? 'bg-white text-slate-700 shadow-sm ring-1 ring-black/5' : 'text-gray-500 hover:text-gray-700'}`}
-                >
-                  Serag's Day
-                </button>
-              </div>
-            </div>
-
             {/* Name */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">Task Name</label>
@@ -192,7 +154,7 @@ export const TaskForm: React.FC<TaskFormProps> = ({ isOpen, onClose, onSave, onD
                 className="block w-full rounded-xl border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm border p-3"
                 value={formData.name || ''}
                 onChange={(e) => handleChange('name', e.target.value)}
-                placeholder={formData.type === 'wedding' ? "e.g. Choose Bridal Bouquet" : "e.g. Pick up the flowers"}
+                placeholder="e.g. Choose Bridal Bouquet"
                 required
               />
             </div>
